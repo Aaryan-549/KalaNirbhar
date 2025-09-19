@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import '../providers/ai_assistant_provider.dart';
+import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/voice_input_button.dart';
 import '../widgets/feature_suggestion_chips.dart';
+import '../services/translation_service.dart';
+import '../widgets/ImageDisplayButton.dart';
 
 class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
@@ -19,6 +22,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late AnimationController _waveAnimationController;
+  Map<String, String> _localizedTexts = {};
+  bool _isLoadingTexts = true;
 
   @override
   void initState() {
@@ -28,11 +33,102 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
       vsync: this,
     )..repeat();
 
-    // Initialize with welcome message
+    // Initialize with welcome message and load localized texts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final aiProvider = Provider.of<AIAssistantProvider>(context, listen: false);
-      aiProvider.addWelcomeMessage();
+      _initializeScreen();
     });
+  }
+
+  Future<void> _initializeScreen() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final aiProvider = Provider.of<AIAssistantProvider>(context, listen: false);
+    
+    // Initialize AI provider with current language and user name
+    aiProvider.initialize(appProvider.selectedLanguage, appProvider.userName);
+    
+    // Load localized texts
+    await _loadLocalizedTexts();
+  }
+
+  Future<void> _loadLocalizedTexts() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final currentLang = appProvider.selectedLanguage;
+    
+    final texts = <String, String>{};
+    
+    // Fallback translations
+    final fallbackTexts = {
+      'hi': {
+        'title': 'सरल बातचीत',
+        'thinking': 'सोच रहा हूं...',
+        'ready': 'आपकी मदद के लिए तैयार',
+        'input_hint': 'अपना सवाल पूछें...',
+        'choose_language': 'भाषा चुनें / Choose Language',
+      },
+      'en': {
+        'title': 'Simple Conversation',
+        'thinking': 'Thinking...',
+        'ready': 'Ready to help you',
+        'input_hint': 'Ask your question...',
+        'choose_language': 'Choose Language',
+      },
+      'pa': {
+        'title': 'ਸਾਦਾ ਗੱਲਬਾਤ',
+        'thinking': 'ਸੋਚ ਰਿਹਾ ਹਾਂ...',
+        'ready': 'ਤੁਹਾਡੀ ਮਦਦ ਲਈ ਤਿਆਰ',
+        'input_hint': 'ਆਪਣਾ ਸਵਾਲ ਪੁੱਛੋ...',
+        'choose_language': 'ਭਾਸ਼ਾ ਚੁਣੋ',
+      },
+      'bn': {
+        'title': 'সরল কথোপকথন',
+        'thinking': 'ভাবছি...',
+        'ready': 'আপনাকে সাহায্য করতে প্রস্তুত',
+        'input_hint': 'আপনার প্রশ্ন জিজ্ঞাসা করুন...',
+        'choose_language': 'ভাষা বেছে নিন',
+      },
+      'mr': {
+        'title': 'सोपा संवाद',
+        'thinking': 'विचार करत आहे...',
+        'ready': 'तुमची मदत करण्यासाठी तयार',
+        'input_hint': 'तुमचा प्रश्न विचारा...',
+        'choose_language': 'भाषा निवडा',
+      },
+    };
+
+    texts.addAll(fallbackTexts[currentLang] ?? fallbackTexts['en']!);
+
+    // Try to get translations from service if available
+    try {
+      final keys = ['title', 'thinking', 'ready', 'input_hint', 'choose_language'];
+      for (final key in keys) {
+        if (currentLang != 'en' && fallbackTexts['en']![key] != null) {
+          try {
+            final translated = await TranslationService.translateText(
+              fallbackTexts['en']![key]!,
+              currentLang,
+              sourceLanguage: 'en'
+            );
+            texts[key] = translated;
+          } catch (e) {
+            // Keep fallback translation
+            print('Translation error for $key: $e');
+          }
+        }
+      }
+    } catch (e) {
+      print('Translation service error: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _localizedTexts = texts;
+        _isLoadingTexts = false;
+      });
+    }
+  }
+
+  String _getText(String key) {
+    return _localizedTexts[key] ?? key;
   }
 
   @override
@@ -45,6 +141,23 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingTexts) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppTheme.primaryBlue, AppTheme.lightBlue],
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -85,8 +198,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
   }
 
   Widget _buildHeader() {
-    return Consumer<AIAssistantProvider>(
-      builder: (context, aiProvider, child) {
+    return Consumer2<AIAssistantProvider, AppProvider>(
+      builder: (context, aiProvider, appProvider, child) {
         return Padding(
           padding: const EdgeInsets.all(20),
           child: Row(
@@ -136,9 +249,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'सरल बातचीत',
-                      style: TextStyle(
+                    Text(
+                      _getText('title'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w600,
@@ -147,8 +260,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
                     ),
                     Text(
                       aiProvider.isProcessing 
-                          ? 'सोच रहा हूं...' 
-                          : 'आपकी मदद के लिए तैयार',
+                          ? _getText('thinking')
+                          : _getText('ready'),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.8),
                         fontSize: 14,
@@ -187,9 +300,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
             return FadeInUp(
               duration: Duration(milliseconds: 300 + (index * 100)),
               child: ChatBubble(
-                message: message['text'],
-                isUser: message['isUser'],
-                timestamp: message['timestamp'],
+                message: message['text'] ?? '',
+                isUser: message['isUser'] ?? false,
+                timestamp: message['timestamp'] ?? DateTime.now(),
               ),
             );
           },
@@ -221,62 +334,70 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             children: [
-              // Text Input
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'अपना सवाल पूछें...',
-                      hintStyle: TextStyle(
-                        fontFamily: 'Poppins',
-                        color: AppTheme.textLight,
+              // Image display button (if images are available)
+              const ImageDisplayButton(),
+              
+              // Input row
+              Row(
+                children: [
+                  // Text Input
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(25),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: InputDecoration(
+                          hintText: _getText('input_hint'),
+                          hintStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            color: AppTheme.textLight,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 16,
+                        ),
+                        onSubmitted: (text) => _sendMessage(text),
                       ),
                     ),
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 16,
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Voice Input Button
+                  VoiceInputButton(
+                    onVoiceInput: (text) => _sendMessage(text),
+                    isListening: aiProvider.isListening,
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // Send Button
+                  GestureDetector(
+                    onTap: () => _sendMessage(_messageController.text),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        gradient: AppTheme.buttonGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
-                    onSubmitted: (text) => _sendMessage(text),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              
-              // Voice Input Button
-              VoiceInputButton(
-                onVoiceInput: (text) => _sendMessage(text),
-                isListening: aiProvider.isListening,
-              ),
-              const SizedBox(width: 8),
-              
-              // Send Button
-              GestureDetector(
-                onTap: () => _sendMessage(_messageController.text),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.buttonGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.send_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
+                ],
               ),
             ],
           ),
@@ -316,9 +437,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'भाषा चुनें / Choose Language',
-                style: TextStyle(
+              Text(
+                _getText('choose_language'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   fontFamily: 'Poppins',
@@ -330,8 +451,8 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
               _buildLanguageOption('English', 'English', 'en'),
               _buildLanguageOption('বাংলা', 'Bengali', 'bn'),
               _buildLanguageOption('मराठी', 'Marathi', 'mr'),
-              _buildLanguageOption('தமிழ்', 'Tamil', 'ta'),
-              _buildLanguageOption('తెలుగు', 'Telugu', 'te'),
+              _buildLanguageOption('ਪੰਜਾਬੀ', 'Punjabi', 'pa'),
+              _buildLanguageOption('ગુજરાતી', 'Gujarati', 'gu'),
               
               const SizedBox(height: 20),
             ],
@@ -340,6 +461,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
       },
     );
   }
+  
 
   Widget _buildLanguageOption(String native, String english, String code) {
     return ListTile(
@@ -356,6 +478,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
             style: const TextStyle(
               color: AppTheme.primaryBlue,
               fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ),
@@ -376,8 +499,16 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
       ),
       onTap: () {
         final aiProvider = Provider.of<AIAssistantProvider>(context, listen: false);
-        aiProvider.changeLanguage(code);
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        
+        // Update both providers
+        appProvider.changeLanguage(code);
+        aiProvider.changeLanguage(code, appProvider.userName);
+        
         Navigator.pop(context);
+        
+        // Reload localized texts
+        _loadLocalizedTexts();
       },
     );
   }

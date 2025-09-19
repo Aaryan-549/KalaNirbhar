@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+    <!-- Add your permissions here -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app needs microphone access for voice commands and story recording.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>This app needs speech recognition to convert your stories and commands into text.</string>
+
 </dict>
 </plist>
