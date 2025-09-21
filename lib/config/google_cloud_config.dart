@@ -2,21 +2,27 @@ class GoogleCloudConfig {
   // TODO: Replace with your actual Google Cloud project details
   
   // Your Google Cloud Project ID
-  static const String projectId = 'YOUR_PROJECT_ID_HERE'; // e.g., 'kalanirbhar-hackathon'
+  static const String projectId = 'perfect-lantern-472316-i5'; // Replace with your actual project ID
   
   // Google Cloud Region (typically us-central1 or asia-south1)
   static const String location = 'us-central1';
   
-  // API Keys - Get from Google Cloud Console
+  // API Keys - Get from Google Cloud Console (for APIs that support API keys)
   static const String geminiApiKey = 'AIzaSyBlMbjAWdhkN0iRLrW1NZPQg-TNJah4udA';
   static const String speechToTextApiKey = 'AIzaSyClVB2dCgnNOyyfacLIAbZpMvHTgnocJ0I';
   static const String textToSpeechApiKey = 'AIzaSyClVB2dCgnNOyyfacLIAbZpMvHTgnocJ0I';
   static const String translationApiKey = 'AIzaSyClVB2dCgnNOyyfacLIAbZpMvHTgnocJ0I';
   static const String visionApiKey = 'AIzaSyClVB2dCgnNOyyfacLIAbZpMvHTgnocJ0I';
-  static const String imagenApiKey = 'AIzaSyClVB2dCgnNOyyfacLIAbZpMvHTgnocJ0I';
+  
+  // Imagen API uses OAuth 2.0, not API keys - requires service account
+  // This will be handled through service account authentication
   
   // Service Account JSON Path (for server-side operations)
   static const String serviceAccountPath = 'assets/service-account.json';
+  
+  // OAuth 2.0 Configuration for Imagen API
+  static const String authScope = 'https://www.googleapis.com/auth/cloud-platform';
+  static const String tokenEndpoint = 'https://oauth2.googleapis.com/token';
   
   // API Endpoints
   static const String geminiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
@@ -24,7 +30,7 @@ class GoogleCloudConfig {
   static const String textToSpeechEndpoint = 'https://texttospeech.googleapis.com/v1/text:synthesize';
   static const String translationEndpoint = 'https://translation.googleapis.com/language/translate/v2';
   static const String visionEndpoint = 'https://vision.googleapis.com/v1/images:annotate';
-  static const String imagenEndpoint = 'https://aiplatform.googleapis.com/v1/projects/$projectId/locations/$location/publishers/google/models/imagen-3.0-generate-001:predict';
+  static const String imagenEndpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/$projectId/locations/$location/publishers/google/models/imagegeneration@006:predict';
   
   // Language Codes for Translation
   static const Map<String, String> supportedLanguages = {

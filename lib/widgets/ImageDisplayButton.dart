@@ -1,269 +1,413 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/ai_assistant_provider.dart';
 import '../utils/app_theme.dart';
+import 'dart:typed_data';
 
-class ImageDisplayButton extends StatelessWidget {
+class ImageDisplayButton extends StatefulWidget {
   const ImageDisplayButton({super.key});
+
+  @override
+  State<ImageDisplayButton> createState() => _ImageDisplayButtonState();
+}
+
+class _ImageDisplayButtonState extends State<ImageDisplayButton> {
+  final TextEditingController _imagePromptController = TextEditingController();
+  XFile? _selectedImage;
+  bool _isImageSelected = false;
+
+  @override
+  void dispose() {
+    _imagePromptController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AIAssistantProvider>(
       builder: (context, aiProvider, child) {
-        // Only show if there are enhanced images
-        if (aiProvider.enhancedImages.isEmpty) {
-          return const SizedBox.shrink();
+        // If image is selected, show the prompt input
+        if (_isImageSelected && _selectedImage != null) {
+          return _buildImagePromptInput();
         }
+        
+        // Show image picker buttons
+        return _buildImagePickerButton();
+      },
+    );
+  }
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              // Image preview button
-              GestureDetector(
-                onTap: () => _showImageGallery(context, aiProvider.enhancedImages),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.buttonGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryBlue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+  Widget _buildImagePickerButton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          // Camera button
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _pickImage(ImageSource.camera),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.primaryBlue, AppTheme.lightBlue],
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Icon(
-                        Icons.photo_library,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Camera',
+                      style: TextStyle(
                         color: Colors.white,
-                        size: 24,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
                       ),
-                      // Badge showing number of images
-                      if (aiProvider.enhancedImages.length > 1)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${aiProvider.enhancedImages.length}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: 12),
+          
+          // Gallery button
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _pickImage(ImageSource.gallery),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.orange, Color(0xFFFF8A65)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.photo_library, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Gallery',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePromptInput() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Selected image preview
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: FutureBuilder<Uint8List>(
+                future: _selectedImage!.readAsBytes(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return Image.memory(
+                      snapshot.data!,
+                      fit: BoxFit.cover,
+                    );
+                  }
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryBlue,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Prompt input
+          TextField(
+            controller: _imagePromptController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Describe what you want to do with this image...\n\nExample: "Make the background white and professional for e-commerce" or "Place this product in a modern living room setting"',
+              hintStyle: const TextStyle(
+                fontFamily: 'Poppins',
+                color: AppTheme.textLight,
+                fontSize: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppTheme.primaryBlue),
+              ),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              color: Colors.black, // Fixed text color
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Action buttons
+          Row(
+            children: [
+              // Cancel button
+              Expanded(
+                child: TextButton(
+                  onPressed: _cancelImageSelection,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: AppTheme.textLight,
+                      fontFamily: 'Poppins',
+                    ),
                   ),
                 ),
               ),
+              
               const SizedBox(width: 12),
-              // Text indicator
+              
+              // Process button
               Expanded(
-                child: Text(
-                  '${aiProvider.enhancedImages.length} enhanced image${aiProvider.enhancedImages.length > 1 ? 's' : ''} ready',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: AppTheme.textLight,
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _processImageWithPrompt,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Enhance Image',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  void _showImageGallery(BuildContext context, List<Uint8List> images) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            height: MediaQuery.of(context).size.height * 0.8,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImage = image;
+          _isImageSelected = true;
+        });
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
               children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.buttonGradient,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.auto_awesome, color: Colors.white),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'AI Enhanced Images',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-                // Image gallery
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: PageView.builder(
-                    itemCount: images.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            // Image counter
-                            Text(
-                              '${index + 1} of ${images.length}',
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 14,
-                                color: AppTheme.textLight,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Image
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.memory(
-                                    images[index],
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        alignment: Alignment.center,
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.error_outline,
-                                              size: 48,
-                                              color: Colors.grey[400],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              'Error loading image',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontFamily: 'Poppins',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Action buttons
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: () => _saveImage(context, images[index]),
-                                  icon: const Icon(Icons.download),
-                                  label: const Text('Save'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryBlue,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _shareImage(context, images[index]),
-                                  icon: const Icon(Icons.share),
-                                  label: const Text('Share'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.orange,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                  child: Text(
+                    'Error selecting image: $e',
+                    style: const TextStyle(fontFamily: 'Poppins'),
                   ),
                 ),
               ],
             ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
-      },
-    );
+      }
+    }
   }
 
-  void _saveImage(BuildContext context, Uint8List imageData) {
-    // TODO: Implement save to gallery functionality
-    // You would use a package like gallery_saver or path_provider + permission_handler
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Save functionality - implement with gallery_saver package',
-          style: TextStyle(fontFamily: 'Poppins'),
-        ),
-        backgroundColor: AppTheme.primaryBlue,
-      ),
-    );
+  void _cancelImageSelection() {
+    setState(() {
+      _selectedImage = null;
+      _isImageSelected = false;
+      _imagePromptController.clear();
+    });
   }
 
-  void _shareImage(BuildContext context, Uint8List imageData) {
-    // TODO: Implement share functionality
-    // You would use a package like share_plus
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Share functionality - implement with share_plus package',
-          style: TextStyle(fontFamily: 'Poppins'),
+  Future<void> _processImageWithPrompt() async {
+    if (_selectedImage == null) return;
+    
+    final prompt = _imagePromptController.text.trim();
+    if (prompt.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please describe what you want to do with the image',
+            style: TextStyle(fontFamily: 'Poppins'),
+          ),
+          backgroundColor: AppTheme.orange,
         ),
-        backgroundColor: AppTheme.orange,
-      ),
-    );
+      );
+      return;
+    }
+
+    try {
+      // Show processing dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppTheme.primaryBlue),
+              const SizedBox(height: 16),
+              const Text(
+                'Enhancing your image with AI...',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                prompt,
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppTheme.textLight,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      // Process with AI
+      final bytes = await _selectedImage!.readAsBytes();
+      final aiProvider = Provider.of<AIAssistantProvider>(context, listen: false);
+      await aiProvider.enhanceProductImageWithPrompt(bytes, prompt);
+      
+      // Close processing dialog
+      if (mounted) {
+        Navigator.pop(context);
+        
+        // Reset the input
+        _cancelImageSelection();
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Image enhanced and added to chat!',
+                  style: TextStyle(fontFamily: 'Poppins'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // Close any open dialogs
+      if (mounted) {
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Error processing image: $e',
+                    style: const TextStyle(fontFamily: 'Poppins'),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
   }
 }

@@ -211,7 +211,7 @@ class AIAssistantProvider extends ChangeNotifier {
     return _translatedSuggestions[_currentLanguage] ?? _baseSuggestions;
   }
 
-  // Send message with Google Cloud AI integration
+  // Enhanced sendMessage with better context and shorter responses
   Future<void> sendMessage(String message) async {
     // Add user message
     _messages.add({
@@ -224,16 +224,26 @@ class AIAssistantProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Use Gemini AI for response generation
-      String response = await GeminiService.generateChatResponse(
+      // Build conversation context for better responses
+      final conversationContext = _buildConversationContext();
+      
+      // Use Gemini AI for response generation with context
+      String response = await GeminiService.generateChatResponseWithContext(
         message, 
         _currentLanguage,
+        conversationContext,
       );
+      
+      // Keep responses concise (max 100 words for regular chat)
+      if (!message.toLowerCase().contains('story') && 
+          !message.toLowerCase().contains('describe') && 
+          !message.toLowerCase().contains('explain detail')) {
+        response = _makeResponseConcise(response);
+      }
       
       // Ensure response is in correct language
       if (_currentLanguage != 'en') {
         try {
-          // Verify language and translate if needed
           response = await TranslationService.translateText(
             response, 
             _currentLanguage,
@@ -241,7 +251,6 @@ class AIAssistantProvider extends ChangeNotifier {
           );
         } catch (translateError) {
           print('Translation error: $translateError');
-          // Keep original response if translation fails
         }
       }
       
@@ -270,6 +279,150 @@ class AIAssistantProvider extends ChangeNotifier {
       _isProcessing = false;
       notifyListeners();
     }
+  }
+
+  // Build conversation context for AI
+  String _buildConversationContext() {
+    final recentMessages = _messages.length > 6 ? _messages.sublist(_messages.length - 6) : _messages;
+    final context = StringBuffer();
+    
+    context.writeln('User: ${_userName.isNotEmpty ? _userName : "User"}');
+    context.writeln('Language: $_currentLanguage');
+    context.writeln('App: KalaNirbhar - AI assistant for handicraft artisans');
+    context.writeln('Recent conversation:');
+    
+    for (final msg in recentMessages) {
+      final speaker = msg['isUser'] == true ? 'User' : 'Assistant';
+      final text = msg['text'] ?? '';
+      if (text.isNotEmpty) {
+        context.writeln('$speaker: ${text.length > 100 ? "${text.substring(0, 100)}..." : text}');
+      }
+    }
+    
+    return context.toString();
+  }
+
+  // Make responses more concise
+  String _makeResponseConcise(String response) {
+    final sentences = response.split('. ');
+    if (sentences.length <= 2) return response;
+    
+    // Keep first 2 sentences for concise responses
+    return '${sentences[0]}. ${sentences[1]}.';
+  }
+
+  // Enhanced image processing with user prompt
+  Future<void> enhanceProductImageWithPrompt(Uint8List imageData, String userPrompt) async {
+    _isProcessingImage = true;
+    notifyListeners();
+
+    try {
+      // Add user message first
+      _messages.add({
+        'text': 'Please enhance this image: $userPrompt',
+        'isUser': true,
+        'timestamp': DateTime.now(),
+        'imagePrompt': userPrompt,
+      });
+      notifyListeners();
+
+      // Localized status messages
+      final analyzingMessage = await _getLocalizedSystemMessage('analyzing_image');
+      _addSystemMessage(analyzingMessage);
+      
+      final analysis = await VisionService.analyzeProductImage(imageData);
+      
+      final enhancingMessage = await _getLocalizedSystemMessage('enhancing_image');
+      _addSystemMessage(enhancingMessage);
+      
+      // Parse user prompt to determine background styles
+      final backgroundStyles = _parseUserPromptForStyles(userPrompt);
+      
+      // Generate enhanced images based on user prompt
+      final enhancedImages = await ImagenService.enhanceProductPhoto(
+        imageData, 
+        backgroundStyles, 
+        userPrompt
+      );
+      
+      if (enhancedImages.isNotEmpty) {
+        // Create contextual response based on user prompt and results
+        final contextualResponse = await _generateContextualResponse(userPrompt, enhancedImages.length, analysis);
+        
+        // Add AI response with enhanced images
+        _messages.add({
+          'text': contextualResponse,
+          'isUser': false,
+          'timestamp': DateTime.now(),
+          'aiGenerated': true,
+          'language': _currentLanguage,
+          'images': enhancedImages,
+          'imagePrompt': userPrompt,
+        });
+      } else {
+        final errorMessage = await _getLocalizedSystemMessage('enhancement_failed');
+        _addSystemMessage(errorMessage);
+      }
+      
+    } catch (e) {
+      print('Image Enhancement Error: $e');
+      final errorMessage = await _getLocalizedSystemMessage('image_processing_error');
+      _addSystemMessage(errorMessage);
+    } finally {
+      _isProcessingImage = false;
+      notifyListeners();
+    }
+  }
+
+  // Parse user prompt to determine appropriate background styles
+  List<String> _parseUserPromptForStyles(String prompt) {
+    final lowerPrompt = prompt.toLowerCase();
+    
+    if (lowerPrompt.contains('white') || lowerPrompt.contains('clean') || lowerPrompt.contains('e-commerce') || lowerPrompt.contains('product')) {
+      return ['white_background'];
+    } else if (lowerPrompt.contains('living room') || lowerPrompt.contains('home') || lowerPrompt.contains('lifestyle')) {
+      return ['lifestyle_modern'];
+    } else if (lowerPrompt.contains('traditional') || lowerPrompt.contains('indian')) {
+      return ['lifestyle_traditional'];
+    } else if (lowerPrompt.contains('luxury') || lowerPrompt.contains('elegant') || lowerPrompt.contains('premium')) {
+      return ['luxury_elegant'];
+    } else if (lowerPrompt.contains('outdoor') || lowerPrompt.contains('natural') || lowerPrompt.contains('nature')) {
+      return ['outdoor_natural'];
+    } else {
+      // Default: provide multiple variations
+      return ['white_background', 'lifestyle_modern', 'luxury_elegant'];
+    }
+  }
+
+  // Generate contextual response based on user prompt and results
+  Future<String> _generateContextualResponse(String userPrompt, int imageCount, Map<String, dynamic> analysis) async {
+    String baseResponse = '';
+    
+    if (_currentLanguage == 'hi') {
+      baseResponse = 'आपकी तस्वीर को AI से enhance कर दिया है! $imageCount professional versions बनाए गए हैं।\n\n';
+      
+      if (userPrompt.toLowerCase().contains('white') || userPrompt.toLowerCase().contains('clean')) {
+        baseResponse += '✨ साफ सफेद background के साथ e-commerce के लिए perfect\n';
+      }
+      if (userPrompt.toLowerCase().contains('lifestyle') || userPrompt.toLowerCase().contains('home')) {
+        baseResponse += '🏠 Modern lifestyle setting में आपका product\n';
+      }
+      
+      baseResponse += '\n📥 Images को download करने के लिए download button दबाएं।';
+    } else {
+      baseResponse = 'I\'ve enhanced your image with AI! Created $imageCount professional versions based on your request.\n\n';
+      
+      if (userPrompt.toLowerCase().contains('white') || userPrompt.toLowerCase().contains('clean')) {
+        baseResponse += '✨ Clean white background perfect for e-commerce\n';
+      }
+      if (userPrompt.toLowerCase().contains('lifestyle') || userPrompt.toLowerCase().contains('home')) {
+        baseResponse += '🏠 Modern lifestyle setting showcasing your product\n';
+      }
+      
+      baseResponse += '\n📥 Tap the download button on each image to save to your device.';
+    }
+    
+    return baseResponse;
   }
 
   // Voice input with Google Speech-to-Text
@@ -303,7 +456,7 @@ class AIAssistantProvider extends ChangeNotifier {
     }
   }
 
-  // Image enhancement with Imagen AI
+  // Image enhancement with Imagen AI (original method)
   Future<void> enhanceProductImage(Uint8List imageData, String productDescription) async {
     _isProcessingImage = true;
     _enhancedImages.clear();
@@ -491,7 +644,7 @@ class AIAssistantProvider extends ChangeNotifier {
     }
   }
 
-  // Get localized system messages
+  // Updated system message keys
   Future<String> _getLocalizedSystemMessage(String messageKey) async {
     final systemMessages = {
       'voice_error': {
@@ -501,22 +654,34 @@ class AIAssistantProvider extends ChangeNotifier {
         'bn': 'কণ্ঠস্বর বুঝতে সমস্যা। অনুগ্রহ করে আবার বলুন।',
       },
       'analyzing_image': {
-        'en': 'Analyzing image with Vision AI...',
-        'hi': 'Vision AI से छवि का विश्লেषण कर रहे हैं...',
-        'pa': 'Vision AI ਨਾਲ ਤਸਵੀਰ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ...',
-        'bn': 'Vision AI দিয়ে ছবি বিশ্লেষণ করছি...',
+        'en': 'Analyzing your image with Vision AI...',
+        'hi': 'Vision AI से आপकी তস্বীর का विश्लेषण कर रहे हैं...',
+        'pa': 'Vision AI ਨਾਲ ਤੁਹਾਡੀ ਤਸਵੀਰ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ...',
+        'bn': 'Vision AI দিয়ে আপনার ছবি বিশ্লেষণ করছি...',
       },
       'enhancing_image': {
-        'en': 'Enhancing photo professionally with Imagen AI...',
-        'hi': 'Imagen AI से फोटो को पेशेवर बना रहे हैं...',
-        'pa': 'Imagen AI ਨਾਲ ਫੋਟੋ ਨੂੰ ਪ੍ਰੋਫੈਸ਼ਨਲ ਬਣਾ ਰਹੇ ਹਾਂ...',
-        'bn': 'Imagen AI দিয়ে ছবি পেশাদারভাবে উন্নত করছি...',
+        'en': 'Creating enhanced versions with Imagen AI...',
+        'hi': 'Imagen AI से enhanced versions बना রহے हैं...',
+        'pa': 'Imagen AI ਨਾਲ enhanced versions ਬਣਾ ਰਹੇ ਹਾਂ...',
+        'bn': 'Imagen AI দিয়ে enhanced versions তৈরি করছি...',
       },
       'enhancement_success': {
-        'en': '🎉 Enhanced photos are ready! Professional backgrounds make your photo e-commerce ready.',
-        'hi': '🎉 Enhanced फोटो तैयार हैं! Professional backgrounds के साथ आपकी फोटो e-commerce के लिए ready है।',
-        'pa': '🎉 Enhanced ਫੋਟੋ ਤਿਆਰ ਹਨ! Professional backgrounds ਨਾਲ ਤੁਹਾਡੀ ਫੋਟੋ e-commerce ਲਈ ਤਿਆਰ ਹੈ।',
-        'bn': '🎉 Enhanced ফটো প্রস্তুত! Professional backgrounds দিয়ে আপনার ফটো e-commerce এর জন্য প্রস্তুত।',
+        'en': '🎉 Images enhanced successfully!',
+        'hi': '🎉 তস্বীরें successfully enhance হো গইں!',
+        'pa': '🎉 ਤਸਵੀਰਾਂ ਸਫਲਤਾ ਨਾਲ enhance ਹੋ ਗਈਆਂ!',
+        'bn': '🎉 ছবিগুলো সফলভাবে enhance হয়ে গেছে!',
+      },
+      'enhancement_failed': {
+        'en': '❌ Enhancement failed. Please try again.',
+        'hi': '❌ Enhancement में समস্যা হুई। कृपया দোবারা कোশিश करें।',
+        'pa': '❌ Enhancement ਵਿੱਚ ਸਮੱਸਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।',
+        'bn': '❌ Enhancement এ সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।',
+      },
+      'image_processing_error': {
+        'en': '⚠️ Error processing image. Please check your connection.',
+        'hi': '⚠️ তস্বীর process করনে में समস্যা। কৃপया connection check করें।',
+        'pa': '⚠️ ਤਸਵੀਰ process ਕਰਨ ਵਿੱਚ ਸਮੱਸਿਆ। ਕਿਰਪਾ ਕਰਕੇ connection ਚੈੱਕ ਕਰੋ।',
+        'bn': '⚠️ ছবি process করতে সমস্যা। অনুগ্রহ করে connection চেক করুন।',
       }
     };
 
@@ -525,7 +690,6 @@ class AIAssistantProvider extends ChangeNotifier {
       return messageMap[_currentLanguage]!;
     }
 
-    // Fallback: translate from English
     final englishMessage = messageMap?['en'] ?? messageKey;
     if (_currentLanguage == 'en') {
       return englishMessage;
@@ -538,16 +702,15 @@ class AIAssistantProvider extends ChangeNotifier {
         sourceLanguage: 'en'
       );
     } catch (e) {
-      print('System message translation error: $e');
-      return englishMessage; // Ultimate fallback
+      return englishMessage;
     }
   }
 
   Future<String> _getFallbackResponse(String message) async {
     final fallbackResponses = {
       'en': 'I understand your question. I\'m trying to serve you better with Google Cloud AI. Please provide more details.',
-      'hi': 'मुझे आपका सवाल समझ आया। Google Cloud AI की मदद से मैं आपकी बेहतर सेवा करने की कोशिश कर रहा हूं। कृपया अधिक विवरण दें।',
-      'pa': 'ਮੈਂ ਤੁਹਾਡਾ ਸਵਾਲ ਸਮਝ ਗਿਆ। Google Cloud AI ਨਾਲ ਮੈਂ ਤੁਹਾਡੀ ਬਿਹਤਰ ਸੇਵਾ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰ ਰਿਹਾ ਹਾਂ।',
+      'hi': 'मुझे आपका सवाल समझ आया। Google Cloud AI की মদদ से मैं आपकी बেहतर सेवा करने की কোशিश کर রহা হूं। কৃপया अधिक विवरण দें।',
+      'pa': 'ਮੈਂ ਤੁਹਾਡਾ ਸਵਾਲ ਸਮझ ਗਿਆ। Google Cloud AI ਨਾਲ ਮੈਂ ਤੁਹਾਡੀ ਬਿਹਤਰ ਸੇਵਾ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰ ਰਿਹਾ ਹਾਂ।',
       'bn': 'আমি আপনার প্রশ্ন বুঝতে পেরেছি। Google Cloud AI দিয়ে আমি আপনাকে আরও ভাল সেবা দেওয়ার চেষ্টা করছি।',
     };
 
@@ -578,6 +741,8 @@ class AIAssistantProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  
+
   // Handle feature suggestions tap with AI integration
   Future<void> handleFeatureSuggestion(String suggestion) async {
     String message = '';
@@ -599,11 +764,11 @@ class AIAssistantProvider extends ChangeNotifier {
     // Map suggestions to actions
     if (englishSuggestion.toLowerCase().contains('photo') || 
         englishSuggestion.toLowerCase().contains('image') ||
-        suggestion.contains('फोटो') || suggestion.contains('ਫੋਟੋ')) {
+        suggestion.contains('फोটो') || suggestion.contains('ਫੋਟੋ')) {
       message = await _getLocalizedSystemMessage('request_photo_enhancement');
     } else if (englishSuggestion.toLowerCase().contains('story') || 
                englishSuggestion.toLowerCase().contains('generate') ||
-               suggestion.contains('कहानी') || suggestion.contains('ਕਹਾਣੀ')) {
+               suggestion.contains('कहানी') || suggestion.contains('ਕਹਾਣੀ')) {
       message = await _getLocalizedSystemMessage('request_story_generation');
     } else if (englishSuggestion.toLowerCase().contains('certificate') ||
                suggestion.contains('प्रमाणपत्र') || suggestion.contains('ਪ੍ਰਮਾਣ')) {
@@ -672,6 +837,7 @@ class AIAssistantProvider extends ChangeNotifier {
   }
 
   // Dispose method to clean up resources
+  @override
   void dispose() {
     AudioService.dispose();
     super.dispose();

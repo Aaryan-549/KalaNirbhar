@@ -171,6 +171,19 @@ class DynamicLocalizationService {
     }
   }
 
+  static Future<String> translateText(String text, String targetLanguage) async {
+  try {
+    return await TranslationService.translateText(
+      text,
+      targetLanguage,
+      sourceLanguage: 'en'
+    );
+  } catch (e) {
+    print('DynamicLocalizationService translation error: $e');
+    return text; // Return original text if translation fails
+  }
+}
+
   // Translate all texts at once (for better performance)
   static Future<void> _translateAllTexts(String languageCode) async {
     try {

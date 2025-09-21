@@ -9,6 +9,7 @@ import '../widgets/voice_input_button.dart';
 import '../widgets/feature_suggestion_chips.dart';
 import '../services/translation_service.dart';
 import '../widgets/ImageDisplayButton.dart';
+import 'dart:typed_data';
 
 class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
@@ -288,29 +289,32 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
     );
   }
 
-  Widget _buildChatArea() {
-    return Consumer<AIAssistantProvider>(
-      builder: (context, aiProvider, child) {
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(20),
-          itemCount: aiProvider.messages.length,
-          itemBuilder: (context, index) {
-            final message = aiProvider.messages[index];
-            return FadeInUp(
-              duration: Duration(milliseconds: 300 + (index * 100)),
-              child: ChatBubble(
-                message: message['text'] ?? '',
-                isUser: message['isUser'] ?? false,
-                timestamp: message['timestamp'] ?? DateTime.now(),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  // Replace your _buildChatArea method with this fixed version
 
+  Widget _buildChatArea() {
+  return Consumer<AIAssistantProvider>(
+    builder: (context, aiProvider, child) {
+      return ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(20),
+        itemCount: aiProvider.messages.length,
+        itemBuilder: (context, index) {
+          final message = aiProvider.messages[index];
+          return FadeInUp(
+            duration: Duration(milliseconds: 300 + (index * 100)),
+            child: ChatBubble(
+              message: message['text'] ?? '',
+              isUser: message['isUser'] ?? false,
+              timestamp: message['timestamp'] ?? DateTime.now(),
+              images: message['images'] as List<Uint8List>?, // Add this line
+              imagePrompt: message['imagePrompt'] as String?, // Add this line
+            ),
+          );
+        },
+      );
+    },
+  );
+}
   Widget _buildFeatureSuggestions() {
     return Container(
       height: 60,
@@ -319,93 +323,95 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
     );
   }
 
-  Widget _buildInputArea() {
-    return Consumer<AIAssistantProvider>(
-      builder: (context, aiProvider, child) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Image display button (if images are available)
-              const ImageDisplayButton(),
-              
-              // Input row
-              Row(
-                children: [
-                  // Text Input
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: InputDecoration(
-                          hintText: _getText('input_hint'),
-                          hintStyle: const TextStyle(
-                            fontFamily: 'Poppins',
-                            color: AppTheme.textLight,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                        ),
-                        onSubmitted: (text) => _sendMessage(text),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  // Voice Input Button
-                  VoiceInputButton(
-                    onVoiceInput: (text) => _sendMessage(text),
-                    isListening: aiProvider.isListening,
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // Send Button
-                  GestureDetector(
-                    onTap: () => _sendMessage(_messageController.text),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        gradient: AppTheme.buttonGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+ // Replace your _buildInputArea method with this fixed version
 
+Widget _buildInputArea() {
+  return Consumer<AIAssistantProvider>(
+    builder: (context, aiProvider, child) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Image picker and display (always visible)
+            const ImageDisplayButton(),
+            
+            // Input row
+            Row(
+              children: [
+                // Text Input
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: _getText('input_hint'),
+                        hintStyle: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: AppTheme.textLight,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        color: Colors.black, // Fixed: Text color is now black
+                      ),
+                      onSubmitted: (text) => _sendMessage(text),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Voice Input Button
+                VoiceInputButton(
+                  onVoiceInput: (text) => _sendMessage(text),
+                  isListening: aiProvider.isListening,
+                ),
+                const SizedBox(width: 8),
+                
+                // Send Button
+                GestureDetector(
+                  onTap: () => _sendMessage(_messageController.text),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      gradient: AppTheme.buttonGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
   void _sendMessage(String text) {
     if (text.trim().isEmpty) return;
     
@@ -461,7 +467,6 @@ class _AIAssistantScreenState extends State<AIAssistantScreen>
       },
     );
   }
-  
 
   Widget _buildLanguageOption(String native, String english, String code) {
     return ListTile(

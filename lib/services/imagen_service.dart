@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../config/google_cloud_config.dart';
+import 'auth_service.dart';
 
 class ImagenService {
   
@@ -35,11 +36,13 @@ class ImagenService {
   ) async {
     try {
       final base64Image = base64Encode(originalImage);
-      
       final prompt = _buildEnhancementPrompt(backgroundStyle, productDescription);
       
+      // Updated endpoint for Imagen 3.0
+      final endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/${GoogleCloudConfig.projectId}/locations/${GoogleCloudConfig.location}/publishers/google/models/imagen-3.0-generate-001:predict';
+      
       final response = await http.post(
-        Uri.parse('${GoogleCloudConfig.imagenEndpoint}'),
+        Uri.parse(endpoint),
         headers: {
           'Authorization': 'Bearer ${await _getAccessToken()}',
           'Content-Type': 'application/json',
@@ -49,27 +52,30 @@ class ImagenService {
             {
               "prompt": prompt,
               "image": {
-                "bytesBase64Encoded": base64Image
-              },
-              "parameters": {
-                "sampleCount": 1,
-                "mode": "upscale", // or "generate"
-                "aspectRatio": "1:1", // Square for e-commerce
-                "negativePrompt": "blurry, low quality, distorted, watermark, text",
-                "guidanceScale": 15,
-                "seed": DateTime.now().millisecondsSinceEpoch % 1000000,
+                "bytesBase64Encoded": base64Image  // Correct field name
               }
             }
-          ]
+          ],
+          "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": "1:1",
+            "negativePrompt": "blurry, low quality, distorted, watermark, text, signature",
+            "guidanceScale": 15,
+            "seed": DateTime.now().millisecondsSinceEpoch % 1000000,
+            "includeRaiReason": false,
+            "outputMimeType": "image/png"
+          }
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List;
-        if (predictions.isNotEmpty) {
+        if (predictions.isNotEmpty && predictions[0]['bytesBase64Encoded'] != null) {
           final imageData = predictions[0]['bytesBase64Encoded'];
           return base64Decode(imageData);
+        } else {
+          print('No image data in response: ${response.body}');
         }
       } else {
         print('Imagen API Error: ${response.statusCode} - ${response.body}');
@@ -87,8 +93,10 @@ class ImagenService {
     try {
       final base64Image = base64Encode(originalImage);
       
+      final endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/${GoogleCloudConfig.projectId}/locations/${GoogleCloudConfig.location}/publishers/google/models/imagen-3.0-generate-001:predict';
+      
       final response = await http.post(
-        Uri.parse('${GoogleCloudConfig.imagenEndpoint}'),
+        Uri.parse(endpoint),
         headers: {
           'Authorization': 'Bearer ${await _getAccessToken()}',
           'Content-Type': 'application/json',
@@ -96,27 +104,30 @@ class ImagenService {
         body: jsonEncode({
           "instances": [
             {
-              "prompt": "Product on pure white background, professional photography, clean, no shadows",
+              "prompt": "Product on pure white background, professional photography, clean, no shadows, isolated object",
               "image": {
                 "bytesBase64Encoded": base64Image
-              },
-              "parameters": {
-                "mode": "edit",
-                "maskMode": "background",
-                "guidanceScale": 20,
               }
             }
-          ]
+          ],
+          "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": "1:1",
+            "guidanceScale": 20,
+            "outputMimeType": "image/png"
+          }
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List;
-        if (predictions.isNotEmpty) {
+        if (predictions.isNotEmpty && predictions[0]['bytesBase64Encoded'] != null) {
           final imageData = predictions[0]['bytesBase64Encoded'];
           return base64Decode(imageData);
         }
+      } else {
+        print('Background Removal Error: ${response.statusCode} - ${response.body}');
       }
       
       return null;
@@ -155,11 +166,12 @@ class ImagenService {
   ) async {
     try {
       final base64Image = base64Encode(productImage);
-      
       final prompt = _buildLifestylePrompt(productType, scene);
       
+      final endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/${GoogleCloudConfig.projectId}/locations/${GoogleCloudConfig.location}/publishers/google/models/imagen-3.0-generate-001:predict';
+      
       final response = await http.post(
-        Uri.parse('${GoogleCloudConfig.imagenEndpoint}'),
+        Uri.parse(endpoint),
         headers: {
           'Authorization': 'Bearer ${await _getAccessToken()}',
           'Content-Type': 'application/json',
@@ -170,24 +182,27 @@ class ImagenService {
               "prompt": prompt,
               "image": {
                 "bytesBase64Encoded": base64Image
-              },
-              "parameters": {
-                "mode": "generate",
-                "guidanceScale": 12,
-                "aspectRatio": "4:3",
               }
             }
-          ]
+          ],
+          "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": "4:3",
+            "guidanceScale": 12,
+            "outputMimeType": "image/png"
+          }
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List;
-        if (predictions.isNotEmpty) {
+        if (predictions.isNotEmpty && predictions[0]['bytesBase64Encoded'] != null) {
           final imageData = predictions[0]['bytesBase64Encoded'];
           return base64Decode(imageData);
         }
+      } else {
+        print('Lifestyle Mockup Error: ${response.statusCode} - ${response.body}');
       }
       
       return null;
@@ -202,8 +217,10 @@ class ImagenService {
     try {
       final base64Image = base64Encode(originalImage);
       
+      final endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/${GoogleCloudConfig.projectId}/locations/${GoogleCloudConfig.location}/publishers/google/models/imagen-3.0-generate-001:predict';
+      
       final response = await http.post(
-        Uri.parse('${GoogleCloudConfig.imagenEndpoint}'),
+        Uri.parse(endpoint),
         headers: {
           'Authorization': 'Bearer ${await _getAccessToken()}',
           'Content-Type': 'application/json',
@@ -211,27 +228,29 @@ class ImagenService {
         body: jsonEncode({
           "instances": [
             {
-              "prompt": "High resolution, sharp details, professional quality, enhanced clarity",
+              "prompt": "High resolution, sharp details, professional quality, enhanced clarity, super detailed",
               "image": {
                 "bytesBase64Encoded": base64Image
-              },
-              "parameters": {
-                "mode": "upscale",
-                "upscaleFactor": scaleFactor,
-                "guidanceScale": 10,
               }
             }
-          ]
+          ],
+          "parameters": {
+            "sampleCount": 1,
+            "guidanceScale": 10,
+            "outputMimeType": "image/png"
+          }
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List;
-        if (predictions.isNotEmpty) {
+        if (predictions.isNotEmpty && predictions[0]['bytesBase64Encoded'] != null) {
           final imageData = predictions[0]['bytesBase64Encoded'];
           return base64Decode(imageData);
         }
+      } else {
+        print('Image Upscaling Error: ${response.statusCode} - ${response.body}');
       }
       
       return null;
@@ -270,11 +289,12 @@ class ImagenService {
   ) async {
     try {
       final base64Image = base64Encode(originalImage);
+      final prompt = '$productDescription, $variation, professional photography, high quality, detailed';
       
-      final prompt = '$productDescription, $variation, professional photography, high quality';
+      final endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/${GoogleCloudConfig.projectId}/locations/${GoogleCloudConfig.location}/publishers/google/models/imagen-3.0-generate-001:predict';
       
       final response = await http.post(
-        Uri.parse('${GoogleCloudConfig.imagenEndpoint}'),
+        Uri.parse(endpoint),
         headers: {
           'Authorization': 'Bearer ${await _getAccessToken()}',
           'Content-Type': 'application/json',
@@ -285,23 +305,26 @@ class ImagenService {
               "prompt": prompt,
               "image": {
                 "bytesBase64Encoded": base64Image
-              },
-              "parameters": {
-                "mode": "edit",
-                "guidanceScale": 12,
               }
             }
-          ]
+          ],
+          "parameters": {
+            "sampleCount": 1,
+            "guidanceScale": 12,
+            "outputMimeType": "image/png"
+          }
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final predictions = data['predictions'] as List;
-        if (predictions.isNotEmpty) {
+        if (predictions.isNotEmpty && predictions[0]['bytesBase64Encoded'] != null) {
           final imageData = predictions[0]['bytesBase64Encoded'];
           return base64Decode(imageData);
         }
+      } else {
+        print('Generate Variation Error: ${response.statusCode} - ${response.body}');
       }
       
       return null;
@@ -314,44 +337,40 @@ class ImagenService {
   // Helper methods
   static String _buildEnhancementPrompt(String backgroundStyle, String productDescription) {
     final stylePrompts = {
-      'white_background': 'Product on pure white background, professional studio lighting, clean, minimal shadows',
-      'lifestyle_modern': 'Product in modern, minimalist interior setting, natural lighting, contemporary style',
-      'lifestyle_traditional': 'Product in traditional Indian home setting, warm lighting, cultural elements',
-      'outdoor_natural': 'Product in natural outdoor setting, soft natural lighting, organic background',
-      'luxury_elegant': 'Product on elegant marble surface, premium lighting, luxurious atmosphere',
-      'colorful_vibrant': 'Product with vibrant colorful background, artistic lighting, creative composition',
+      'white_background': 'Product on pure white background, professional studio lighting, clean, minimal shadows, e-commerce photography',
+      'lifestyle_modern': 'Product in modern, minimalist interior setting, natural lighting, contemporary style, home environment',
+      'lifestyle_traditional': 'Product in traditional Indian home setting, warm lighting, cultural elements, authentic atmosphere',
+      'outdoor_natural': 'Product in natural outdoor setting, soft natural lighting, organic background, nature environment',
+      'luxury_elegant': 'Product on elegant marble surface, premium lighting, luxurious atmosphere, high-end presentation',
+      'colorful_vibrant': 'Product with vibrant colorful background, artistic lighting, creative composition, eye-catching design',
     };
     
     final basePrompt = stylePrompts[backgroundStyle] ?? stylePrompts['white_background']!;
-    return '$productDescription, $basePrompt, high resolution, professional photography, sharp details';
+    return '$productDescription, $basePrompt, high resolution, professional photography, sharp details, perfect lighting';
   }
 
   static String _buildLifestylePrompt(String productType, String scene) {
     final scenePrompts = {
-      'living_room': 'Beautiful modern living room, cozy atmosphere, natural lighting, home decor',
-      'bedroom': 'Elegant bedroom interior, soft lighting, comfortable setting, home decoration',
-      'kitchen': 'Clean modern kitchen, bright lighting, functional space, home environment',
-      'office': 'Professional office space, clean lighting, work environment, modern interior',
-      'garden': 'Beautiful garden setting, natural outdoor lighting, plants and flowers',
-      'traditional_home': 'Traditional Indian home interior, cultural elements, warm atmosphere',
+      'living_room': 'Beautiful modern living room, cozy atmosphere, natural lighting, home decor, comfortable setting',
+      'bedroom': 'Elegant bedroom interior, soft lighting, comfortable setting, home decoration, peaceful environment',
+      'kitchen': 'Clean modern kitchen, bright lighting, functional space, home environment, organized setting',
+      'office': 'Professional office space, clean lighting, work environment, modern interior, productive atmosphere',
+      'garden': 'Beautiful garden setting, natural outdoor lighting, plants and flowers, peaceful environment',
+      'traditional_home': 'Traditional Indian home interior, cultural elements, warm atmosphere, authentic setting',
     };
     
     final scenePrompt = scenePrompts[scene] ?? scenePrompts['living_room']!;
-    return '$productType placed in $scenePrompt, realistic placement, natural integration, professional photography';
+    return '$productType naturally placed in $scenePrompt, realistic placement, natural integration, professional photography, high quality';
   }
 
   // Get access token for Google Cloud APIs
   static Future<String> _getAccessToken() async {
-    // TODO: Implement proper OAuth2 flow or service account authentication
-    // For now, return placeholder - you'll need to implement this based on your auth method
-    
-    // Option 1: Service Account (recommended for server-side)
-    // Use google_auth_library package to get access token from service account JSON
-    
-    // Option 2: OAuth2 (for client-side applications)
-    // Implement OAuth2 flow to get user access token
-    
-    return 'YOUR_ACCESS_TOKEN_HERE'; // Placeholder
+    try {
+      return await AuthService.getAccessToken();
+    } catch (e) {
+      print('Failed to get access token: $e');
+      throw Exception('Authentication failed for Imagen API');
+    }
   }
 
   // Predefined background styles for product photography

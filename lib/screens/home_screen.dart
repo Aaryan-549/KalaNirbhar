@@ -5,6 +5,8 @@ import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/feature_card.dart';
 import '../services/dynamic_localization_service.dart';
+import '../services/translation_service.dart';
+import '../widgets/voice_ai_bubble.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,8 +16,34 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final PageController _marketplaceController = PageController();
   Map<String, Map<String, String>> _localizedTexts = {};
   bool _isLoading = true;
+
+  // Marketplace data
+  final List<Map<String, dynamic>> _marketplaces = [
+    {
+      'name': 'Amazon',
+      'nameKey': 'amazon_marketplace',
+      'color': const Color(0xFF232F3E),
+      'logo': 'assets/amazon-logo.png',
+      'route': '/amazon-marketplace',
+    },
+    {
+      'name': 'Etsy', 
+      'nameKey': 'etsy_marketplace',
+      'color': const Color(0xFFD56638),
+      'logo': 'assets/etsy.png',
+      'route': '/etsy-marketplace',
+    },
+    {
+      'name': 'Flipkart',
+      'nameKey': 'flipkart_marketplace', 
+      'color': const Color(0xFF2874F0),
+      'logo': 'assets/flipkart.png',
+      'route': '/flipkart-marketplace',
+    },
+  ];
 
   @override
   void initState() {
@@ -24,165 +52,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final appProvider = Provider.of<AppProvider>(context);
-    if (_localizedTexts[appProvider.selectedLanguage] == null) {
-      _loadLocalizedTexts();
-    }
+  void dispose() {
+    _marketplaceController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLocalizedTexts() async {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final currentLang = appProvider.selectedLanguage;
     
-    if (_localizedTexts[currentLang] != null) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
     final texts = <String, String>{};
     
-    // Define all text keys used in this screen
-    final textKeys = [
-      'business_question', 'daily_summary', 'today_sales',
-      'new_orders', 'main_services', 'recent_activity', 
-      'image_enhancement', 'improve_photos', 'storyteller', 
-      'write_descriptions', 'security_shield', 'digital_certificates', 
-      'marketing_assistant', 'marketing_help', 'certificate_received',
-      'hours_ago', 'new_order_amazon', 'collaboration_proposal', 'day_ago'
-    ];
-    
-    // Fallback translations for all supported languages
+    // Fallback translations
     final fallbackTexts = {
       'hi': {
-        'business_question': 'आज आपका व्यापार कैसा चल रहा है?',
-        'daily_summary': 'आज का सारांश',
-        'today_sales': 'आज की बिक्री',
-        'new_orders': 'नए ऑर्डर',
-        'main_services': 'मुख्य सेवाएं',
-        'recent_activity': 'हाल की गतिविधि',
-        'image_enhancement': 'फोटो सुधार',
-        'improve_photos': 'फोटो बेहतर बनाएं',
-        'storyteller': 'कहानीकार',
-        'write_descriptions': 'उत्पाद विवरण लिखें',
-        'security_shield': 'सुरक्षा ढाल',
-        'digital_certificates': 'डिजिटल प्रमाणपत्र',
-        'marketing_assistant': 'मार्केटिंग सहायक',
-        'marketing_help': 'मार्केटिंग सहायता',
-        'certificate_received': 'प्रमाणपत्र प्राप्त हुआ',
-        'hours_ago': 'घंटे पहले',
-        'new_order_amazon': 'Amazon से नया ऑर्डर',
-        'collaboration_proposal': 'सहयोग प्रस्ताव',
-        'day_ago': 'दिन पहले',
+        'our_marketplace': 'हमारा मार्केटप्लेस',
+        'select_to_enter': 'प्रवेश के लिए चुनें',
+        'products': 'उत्पाद',
+        'analytics': 'एनालिटिक्स',
+        'add_product': 'उत्पाद जोड़ें',
+        'recent_products': 'हाल के उत्पाद',
+        'certificate': 'प्रमाणपत्र',
+        'welcome_back': 'वापस स्वागत है',
+        'amazon_marketplace': 'अमेज़न मार्केटप्लेस',
+        'etsy_marketplace': 'एत्सी मार्केटप्लेस',
+        'flipkart_marketplace': 'फ्लिपकार्ट मार्केटप्लेस',
       },
       'en': {
-        'business_question': 'How is your business doing today?',
-        'daily_summary': 'Today\'s Summary',
-        'today_sales': 'Today\'s Sales',
-        'new_orders': 'New Orders',
-        'main_services': 'Main Services',
-        'recent_activity': 'Recent Activity',
-        'image_enhancement': 'Image Enhancement',
-        'improve_photos': 'Make photos better',
-        'storyteller': 'Storyteller',
-        'write_descriptions': 'Write product descriptions',
-        'security_shield': 'Security Shield',
-        'digital_certificates': 'Digital Certificates',
-        'marketing_assistant': 'Marketing Assistant',
-        'marketing_help': 'Marketing Help',
-        'certificate_received': 'Certificate received',
-        'hours_ago': 'hours ago',
-        'new_order_amazon': 'New order from Amazon',
-        'collaboration_proposal': 'Collaboration proposal',
-        'day_ago': 'day ago',
-      },
-      'pa': {
-        'business_question': 'ਅੱਜ ਤੁਹਾਡਾ ਕਾਰੋਬਾਰ ਕਿਵੇਂ ਚੱਲ ਰਿਹਾ ਹੈ?',
-        'daily_summary': 'ਅੱਜ ਦਾ ਸਾਰਾਂਸ਼',
-        'today_sales': 'ਅੱਜ ਦੀ ਵਿਕਰੀ',
-        'new_orders': 'ਨਵੇ ਆਰਡਰ',
-        'main_services': 'ਮੁੱਖ ਸੇਵਾਵਾਂ',
-        'recent_activity': 'ਤਾਜ਼ਾ ਗਤਿਵਿਧੀ',
-        'image_enhancement': 'ਫੋਟੋ ਸੁਧਾਰ',
-        'improve_photos': 'ਫੋਟੋ ਬਿਹਤਰ ਬਣਾਓ',
-        'storyteller': 'ਕਹਾਣੀਕਾਰ',
-        'write_descriptions': 'ਉਤਪਾਦ ਵਿਵਰਣ ਲਿਖੋ',
-        'security_shield': 'ਸੁਰੱਖਿਆ ਢਾਲ',
-        'digital_certificates': 'ਡਿਜੀਟਲ ਪ੍ਰਮਾਣ ਪੱਤਰ',
-        'marketing_assistant': 'ਮਾਰਕੀਟਿੰਗ ਸਹਾਇਕ',
-        'marketing_help': 'ਮਾਰਕੀਟਿੰਗ ਸਹਾਇਤਾ',
-        'certificate_received': 'ਪ੍ਰਮਾਣ ਪੱਤਰ ਮਿਲਿਆ',
-        'hours_ago': 'ਘੰਟੇ ਪਹਿਲਾਂ',
-        'new_order_amazon': 'Amazon ਤੋਂ ਨਵਾਂ ਆਰਡਰ',
-        'collaboration_proposal': 'ਸਹਿਯੋਗ ਪ੍ਰਸਤਾਵ',
-        'day_ago': 'ਦਿਨ ਪਹਿਲਾਂ',
-      },
-      'bn': {
-        'business_question': 'আজ আপনার ব্যবসা কেমন চলছে?',
-        'daily_summary': 'আজকের সারসংক্ষেপ',
-        'today_sales': 'আজকের বিক্রয়',
-        'new_orders': 'নতুন অর্ডার',
-        'main_services': 'প্রধান সেবা',
-        'recent_activity': 'সাম্প্রতিক কার্যকলাপ',
-        'image_enhancement': 'ছবি উন্নতি',
-        'improve_photos': 'ছবি ভালো করুন',
-        'storyteller': 'গল্পকার',
-        'write_descriptions': 'পণ্য বিবরণ লিখুন',
-        'security_shield': 'নিরাপত্তা ঢাল',
-        'digital_certificates': 'ডিজিটাল সার্টিফিকেট',
-        'marketing_assistant': 'মার্কেটিং সহায়ক',
-        'marketing_help': 'মার্কেটিং সাহায্য',
-        'certificate_received': 'সার্টিফিকেট পেয়েছেন',
-        'hours_ago': 'ঘন্টা আগে',
-        'new_order_amazon': 'Amazon থেকে নতুন অর্ডার',
-        'collaboration_proposal': 'সহযোগিতার প্রস্তাব',
-        'day_ago': 'দিন আগে',
-      },
-      'mr': {
-        'business_question': 'आज तुमचा व्यवसाय कसा चालला आहे?',
-        'daily_summary': 'आजचा सारांश',
-        'today_sales': 'आजची विक्री',
-        'new_orders': 'नवीन ऑर्डर',
-        'main_services': 'मुख्य सेवा',
-        'recent_activity': 'अलीकडील क्रियाकलाप',
-        'image_enhancement': 'प्रतिमा सुधारणा',
-        'improve_photos': 'फोटो सुधारा',
-        'storyteller': 'कथाकार',
-        'write_descriptions': 'उत्पादन वर्णन लिहा',
-        'security_shield': 'सुरक्षा ढाल',
-        'digital_certificates': 'डिजिटल प्रमाणपत्र',
-        'marketing_assistant': 'मार्केटिंग सहाय्यक',
-        'marketing_help': 'मार्केटिंग मदत',
-        'certificate_received': 'प्रमाणपत्र मिळाले',
-        'hours_ago': 'तासांपूर्वी',
-        'new_order_amazon': 'Amazon कडून नवीन ऑर्डर',
-        'collaboration_proposal': 'सहकार्य प्रस्ताव',
-        'day_ago': 'दिवसापूर्वी',
+        'our_marketplace': 'Our Marketplace',
+        'select_to_enter': 'Select to enter',
+        'products': 'Products',
+        'analytics': 'Analytics',
+        'add_product': 'Add Product',
+        'recent_products': 'Recent Products',
+        'certificate': 'Certificate',
+        'welcome_back': 'Welcome Back',
+        'amazon_marketplace': 'Amazon Marketplace',
+        'etsy_marketplace': 'Etsy Marketplace',
+        'flipkart_marketplace': 'Flipkart Marketplace',
       },
     };
     
-    // Use fallback translations first, then try to get from service
     texts.addAll(fallbackTexts[currentLang] ?? fallbackTexts['en']!);
-    
-    try {
-      // Try to get translations from service (if available)
-      for (final key in textKeys) {
-        try {
-          final translatedText = await DynamicLocalizationService.getText(key);
-          if (translatedText.isNotEmpty && translatedText != key) {
-            texts[key] = translatedText;
-          }
-        } catch (e) {
-          // Keep fallback translation
-          print('Translation service error for $key: $e');
-        }
-      }
-    } catch (e) {
-      print('Localization service error: $e');
-    }
     
     if (mounted) {
       setState(() {
@@ -218,76 +129,90 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.primaryBlue, AppTheme.lightBlue],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 20),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.backgroundLight,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                  ),
+      backgroundColor: Colors.grey[50],
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 20),
-                        _buildQuickStats(),
+                        _buildMarketplaceSection(),
                         const SizedBox(height: 30),
-                        _buildFeaturesSection(),
+                        _buildQuickActions(),
                         const SizedBox(height: 30),
-                        _buildRecentActivity(),
+                        _buildRecentProducts(),
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          
+          // Voice AI Assistant Bubble
+          const VoiceAIBubble(),
+        ],
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryBlue, AppTheme.lightBlue],
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Consumer<AppProvider>(
+        builder: (context, appProvider, child) {
+          return Row(
             children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      appProvider.getGreeting(),
+                      _getText('welcome_back'),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                         fontFamily: 'Poppins',
                       ),
                     ),
                     Text(
-                      _getText('business_question'),
+                      appProvider.userName.isNotEmpty 
+                          ? appProvider.userName 
+                          : 'Artisan',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 14,
                         fontFamily: 'Poppins',
                       ),
                     ),
@@ -295,8 +220,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                width: 48,
-                height: 48,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -304,22 +229,283 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(
                   Icons.notifications_outlined,
                   color: Colors.white,
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildQuickStats() {
+  Widget _buildMarketplaceSection() {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryBlue,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: Text(
+            _getText('our_marketplace'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            controller: _marketplaceController,
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _marketplaces.length,
+            itemBuilder: (context, index) {
+              final marketplace = _marketplaces[index];
+              return FadeInUp(
+                duration: Duration(milliseconds: 600 + (index * 100)),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(context, marketplace['route'] as String);
+                  },
+                  child: Container(
+                    width: 280,
+                    margin: EdgeInsets.only(
+                      left: index == 0 ? 0 : 8,
+                      right: index == _marketplaces.length - 1 ? 0 : 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: marketplace['color'] as Color,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0x33000000),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          child: Image.asset(
+                            marketplace['logo'] as String,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Text(
+                                  (marketplace['name'] as String).substring(0, 1),
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: marketplace['color'] as Color,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _getText(marketplace['nameKey'] as String),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _getText('select_to_enter'),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.swipe_left,
+              color: Colors.grey[400],
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Swipe to explore',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.swipe_right,
+              color: Colors.grey[400],
+              size: 16,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: FadeInLeft(
+            duration: const Duration(milliseconds: 800),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/products');
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0x1A000000),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.inventory,
+                      color: AppTheme.primaryBlue,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getText('products'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: FadeInRight(
+            duration: const Duration(milliseconds: 800),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/analytics');
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0x1A000000),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.analytics,
+                      color: AppTheme.orange,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getText('analytics'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentProducts() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        FadeInUp(
+          duration: const Duration(milliseconds: 900),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/add-product');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: AppTheme.primaryBlue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppTheme.primaryBlue, width: 2),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                _getText('add_product'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(
-          _getText('daily_summary'),
+          _getText('recent_products'),
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -328,249 +514,56 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: FadeInLeft(
-                duration: const Duration(milliseconds: 600),
-                child: _buildQuickStatsCard(
-                  title: _getText('today_sales'),
-                  value: '₹2,430',
-                  icon: Icons.trending_up,
-                  color: Colors.green,
-                  change: '+12%',
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: FadeInRight(
-                duration: const Duration(milliseconds: 600),
-                child: _buildQuickStatsCard(
-                  title: _getText('new_orders'),
-                  value: '5',
-                  icon: Icons.shopping_bag,
-                  color: AppTheme.primaryBlue,
-                  change: '+2',
-                ),
-              ),
-            ),
-          ],
+        FadeInUp(
+          duration: const Duration(milliseconds: 1000),
+          child: _buildProductCard(
+            'Handwoven Scarf',
+            '₹1,299',
+            'Beautiful traditional scarf',
+            Icons.favorite,
+          ),
+        ),
+        FadeInUp(
+          duration: const Duration(milliseconds: 1100),
+          child: _buildProductCard(
+            'Wooden Vase',
+            '₹899',
+            'Handcrafted wooden decoration',
+            Icons.favorite_border,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildQuickStatsCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required String change,
-  }) {
+  Widget _buildProductCard(String name, String price, String description, IconData favoriteIcon) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  change,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontFamily: 'Poppins',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.textLight,
-              fontFamily: 'Poppins',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _getText('main_services'),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textDark,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.1,
-          children: [
-            FadeInUp(
-              duration: const Duration(milliseconds: 800),
-              child: FeatureCard(
-                title: _getText('image_enhancement'),
-                subtitle: _getText('improve_photos'),
-                icon: Icons.photo_camera,
-                color: Colors.purple,
-              ),
-            ),
-            FadeInUp(
-              duration: const Duration(milliseconds: 900),
-              child: FeatureCard(
-                title: _getText('storyteller'),
-                subtitle: _getText('write_descriptions'),
-                icon: Icons.auto_stories,
-                color: Colors.orange,
-              ),
-            ),
-            FadeInUp(
-              duration: const Duration(milliseconds: 1000),
-              child: FeatureCard(
-                title: _getText('security_shield'),
-                subtitle: _getText('digital_certificates'),
-                icon: Icons.security,
-                color: Colors.teal,
-              ),
-            ),
-            FadeInUp(
-              duration: const Duration(milliseconds: 1100),
-              child: FeatureCard(
-                title: _getText('marketing_assistant'),
-                subtitle: _getText('marketing_help'),
-                icon: Icons.campaign,
-                color: Colors.red,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecentActivity() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _getText('recent_activity'),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textDark,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        const SizedBox(height: 16),
-        FadeInUp(
-          duration: const Duration(milliseconds: 1200),
-          child: _buildActivityItem(
-            _getText('certificate_received'),
-            '2 ${_getText('hours_ago')}',
-            Icons.verified,
-            Colors.green,
-          ),
-        ),
-        FadeInUp(
-          duration: const Duration(milliseconds: 1300),
-          child: _buildActivityItem(
-            _getText('new_order_amazon'),
-            '5 ${_getText('hours_ago')}',
-            Icons.shopping_cart,
-            AppTheme.orange,
-          ),
-        ),
-        FadeInUp(
-          duration: const Duration(milliseconds: 1400),
-          child: _buildActivityItem(
-            _getText('collaboration_proposal'),
-            '1 ${_getText('day_ago')}',
-            Icons.handshake,
-            AppTheme.primaryBlue,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActivityItem(String title, String time, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: const Color(0x14000000),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
+            child: const Icon(
+              Icons.image,
+              color: Colors.grey,
+              size: 24,
             ),
           ),
           const SizedBox(width: 16),
@@ -579,30 +572,60 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  name,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textDark,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                     fontFamily: 'Poppins',
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  time,
+                  description,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textLight,
                     fontFamily: 'Poppins',
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryBlue,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right,
-            color: AppTheme.textLight,
-            size: 20,
+          Column(
+            children: [
+              Icon(
+                favoriteIcon,
+                color: Colors.red,
+                size: 20,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _getText('certificate'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

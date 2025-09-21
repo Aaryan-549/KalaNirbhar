@@ -57,6 +57,76 @@ class GeminiService {
     }
   }
 
+  // Add this method to your GeminiService class
+
+static Future<String> generateChatResponseWithContext(
+  String message, 
+  String language,
+  String conversationContext,
+) async {
+  try {
+    final prompt = '''
+$conversationContext
+
+Instructions for response:
+- Keep responses concise (1-2 sentences for simple questions)
+- Be helpful and direct
+- Respond in $language language
+- For handicraft/artisan questions, be specific and practical
+- Avoid overly long explanations unless specifically asked
+
+User question: $message
+
+Response:''';
+
+    final response = await http.post(
+      Uri.parse('${GoogleCloudConfig.geminiEndpoint}?key=${GoogleCloudConfig.geminiApiKey}'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "contents": [{
+          "parts": [{
+            "text": prompt
+          }]
+        }],
+        "generationConfig": {
+          "temperature": 0.7,
+          "topK": 40,
+          "topP": 0.95,
+          "maxOutputTokens": 150,  // Limited for concise responses
+          "candidateCount": 1,
+        },
+        "safetySettings": [
+          {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            "category": "HARM_CATEGORY_HATE_SPEECH", 
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['candidates'] != null && data['candidates'].isNotEmpty) {
+        final content = data['candidates'][0]['content']['parts'][0]['text'];
+        return content?.toString().trim() ?? 'I understand your question. How can I help you better?';
+      }
+    } else {
+      print('Gemini API Error: ${response.statusCode} - ${response.body}');
+    }
+    
+    return 'I understand your question. How can I help you better?';
+  } catch (e) {
+    print('Gemini Chat Error: $e');
+    return 'I understand your question. How can I help you better?';
+  }
+}
+
   // Generate product description
   static Future<String> generateProductDescription(Map<String, dynamic> productInfo, String language) async {
     try {
