@@ -213,8 +213,8 @@ class _VoiceAIBubbleState extends State<VoiceAIBubble>
               itemBuilder: (context, index) {
                 final message = aiProvider.messages[index];
                 return _buildMessageBubble(
-                  message['text'] ?? '',
-                  message['isUser'] ?? false,
+                  message['text']?.toString() ?? '',
+                  message['isUser'] == true,
                   message['timestamp'] ?? DateTime.now(),
                 );
               },
@@ -382,23 +382,39 @@ class _VoiceAIBubbleState extends State<VoiceAIBubble>
   }
 
   void _startVoiceInput(AIAssistantProvider aiProvider) {
-    aiProvider.startListening();
-    // Here you would integrate with speech recognition
-    // For now, we'll simulate it
-    _simulateVoiceInput(aiProvider);
+    print('DEBUG: Starting voice input');
+    try {
+      aiProvider.startListening();
+      _simulateVoiceInput(aiProvider);
+    } catch (e) {
+      print('DEBUG: Error in _startVoiceInput: $e');
+      aiProvider.stopListening();
+    }
   }
 
   void _stopVoiceInput(AIAssistantProvider aiProvider) {
-    aiProvider.stopListening();
+    try {
+      aiProvider.stopListening();
+    } catch (e) {
+      print('DEBUG: Error in _stopVoiceInput: $e');
+    }
   }
 
-  // Simulate voice input for demonstration
+  // Simulate voice input for demonstration - FIXED VERSION
   void _simulateVoiceInput(AIAssistantProvider aiProvider) {
     Future.delayed(const Duration(seconds: 2), () {
-      if (aiProvider.isListening) {
+      try {
+        if (aiProvider.isListening) {
+          aiProvider.stopListening();
+          // Add null check and safe message sending
+          final message = "I want to enhance my product photo with AI";
+          if (message.isNotEmpty) {
+            aiProvider.sendMessage(message);
+          }
+        }
+      } catch (e) {
+        print('Simulate voice input error: $e');
         aiProvider.stopListening();
-        // Simulate sending a voice message
-        aiProvider.sendMessage("I want to enhance my product photo with AI");
       }
     });
   }
